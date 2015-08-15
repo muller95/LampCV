@@ -82,11 +82,13 @@ void clust(const Mat *in, Mat *out, uint k)
 }
 
 uint *create_mask(const Mat *frame,
-	const vector<Mat> *prev_frames, float coldist)
+	const vector<Mat> *prev_frames, double *hsv, const vector<double *> *prev_hsv, float coldist)
 {
 	uint w = frame->cols;
 	uint h = frame->rows;
 	const Mat *bg = &(*prev_frames)[0];	
+	const double *bg_hsv = (*prev_hsv)[0];
+
 	// mask indices start from 1, all elements, that have 0 and h + 1 as
 	// one of their indices, are filled with 0
 	uint *mask = (uint *) calloc((w + 2) * (h + 2), sizeof(uint));
@@ -101,7 +103,13 @@ uint *create_mask(const Mat *frame,
 				bg->data[bg->channels() * (w * y + x) + 1],
 				bg->data[bg->channels() * (w * y + x) + 2]);
 
-			if (color_dist(&c0, &c1) > coldist)
+			double h = hsv[3 * (w * y + x) + 0],
+				s = hsv[3 * (w * y + x) + 1];
+
+			double prh = bg_hsv[3 * (w * y + x) + 0],
+				prs = bg_hsv[3 * (w * y + x) + 1];
+
+			if (color_dist(&c0, &c1) > coldist && (fabs(h - prh) >= 90.0 || fabs(s - prs) >= 0.8))
 				mask[(w + 2) * (y + 1) + x + 1] = 1;	
 			else
 				mask[(w + 2) * (y + 1) + x + 1] = 0;
@@ -152,6 +160,58 @@ uint *mask_to_quads(uint *mask, uint w, uint h, uint *sqrw, uint *sqrh)
 	return quads;
 }
 
+double *to_hsv(const Mat *frame)
+{
+	uint w = frame->cols;
+	uint h = frame->rows;
+
+	double *hsv = (double *)malloc(sizeof(double) * w * h * 3);
+
+	for (int y = 0; y < h; y++) {
+		for (int x = 0; x < w; x++) {
+			int mtype;
+			double r, g, b;
+				
+			r = (double)frame->data[frame->channels() * (w * y + x) + 0] / 255.0;
+			g = (double)frame->data[frame->channels() * (w * y + x) + 1] / 255.0;
+			b = (double)frame->data[frame->channels() * (w * y + x) + 2] / 255.0;
+			
+			double max, min, h, s, v;
+			max = min = r;
+			mtype = 0;
+			if (g > max) {
+				max = g;
+				mtype = 1;
+			}
+			if (b > max) {
+				max = b;
+				mtype = 2;	
+			}
+			min = (g < min) ? g : min;
+			min = (b < min) ? b : min;
+
+			v = max;
+			s = (max == 0) ? 0 : 1.0 - min / max;
+			
+			if (max == min) {
+				h = 0;
+			} else if (mtype == 0) {
+				h = 60 * (g - b) / (max - min) + (g >= b)? 0.0 : 360.0;
+			} else if (mtype == 1) {
+				h = 60 * (b - r) / (max - min) + 120.0;
+			} else if (mtype == 2) {
+				h = 60 * (r - g) / (max - min) + 240.0;
+			}
+		
+			hsv[3 * (w * y + x) + 0] = h;
+			hsv[3 * (w * y + x) + 1] = s;
+			hsv[3 * (w * y + x) + 2] = v;
+		}
+	}
+
+	return hsv;
+}
+
 void find_objects(const Mat *frame, const vector<Mat> *prev_frames, Mat *movement)
 {
 	uint w = frame->cols;
@@ -159,10 +219,30 @@ void find_objects(const Mat *frame, const vector<Mat> *prev_frames, Mat *movemen
 	uint *mask;
 	uint *quads;
 	uint sqrw, sqrh;
+	double *hsv;
+	vector<double *> prev_hsv;
+	hsv = to_hsv(frame);
 
-	mask = create_mask(frame, prev_frames, 25.0);
+	for (int i = 0; i < prev_frames->size(); i++) {
+		prev_hsv.push_back(to_hsv(&((*prev_frames)[i])));
+
+	}	
+
+
+	mask = create_mask(frame, prev_frames, hsv, &prev_hsv, 25.0);
 	nearest_pixels(mask, w, h);
 	quads = mask_to_quads(mask, w, h, &sqrw, &sqrh);	
+
+/*
+	for (int y = 0; y < h; y++) {
+		for (int x = 0; x < w; x++) { 		
+			movement->data[frame->channels() * (w * y + x) + 0] = (uchar)(hsv[3 * (w * y + x) + 0] / 360.0 * 255.0);
+			movement->data[frame->channels() * (w * y + x) + 1] = (uchar)(hsv[3 * (w * y + x) + 1] * 255.0);
+			movement->data[frame->channels() * (w * y + x) + 2] = (uchar)(hsv[3 * (w * y + x) + 2] * 255.0);
+			
+		}
+	}
+*/
 
 	for (int y = 0; y < sqrh; y++) {
 		for (int x = 0; x < sqrw; x++) { 
@@ -175,7 +255,11 @@ void find_objects(const Mat *frame, const vector<Mat> *prev_frames, Mat *movemen
 		}
 	}
 
+	for (int i = 0; i < prev_hsv.size(); i++) {
+		free(prev_hsv[i]);
+	}
 
+	free(hsv);
 	free(mask);
 	free(quads);
 }
