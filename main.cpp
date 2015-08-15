@@ -7,7 +7,7 @@
 using namespace cv;
 using namespace std;
 
-#define QUAD_EDGE 50
+#define QUAD_EDGE 25
 
 enum KEY
 {
@@ -82,12 +82,10 @@ void clust(const Mat *in, Mat *out, uint k)
 }
 
 uint *create_mask(const Mat *frame,
-	const vector<Mat> *prev_frames, double *hsv, const vector<double *> *prev_hsv, float coldist)
+	const Mat *prev_frame, double *hsv, double *prev_hsv, float coldist)
 {
 	uint w = frame->cols;
 	uint h = frame->rows;
-	const Mat *bg = &(*prev_frames)[0];	
-	const double *bg_hsv = (*prev_hsv)[0];
 
 	// mask indices start from 1, all elements, that have 0 and h + 1 as
 	// one of their indices, are filled with 0
@@ -99,15 +97,15 @@ uint *create_mask(const Mat *frame,
 			color c0 (frame->data[frame->channels() * (w * y + x) + 0],
 				frame->data[frame->channels() * (w * y + x) + 1],
 				frame->data[frame->channels() * (w * y + x) + 2]);
-			color c1 (bg->data[bg->channels() * (w * y + x) + 0],
-				bg->data[bg->channels() * (w * y + x) + 1],
-				bg->data[bg->channels() * (w * y + x) + 2]);
+			color c1 (prev_frame->data[prev_frame->channels() * (w * y + x) + 0],
+				prev_frame->data[prev_frame->channels() * (w * y + x) + 1],
+				prev_frame->data[prev_frame->channels() * (w * y + x) + 2]);
 
 			double h = hsv[3 * (w * y + x) + 0],
 				s = hsv[3 * (w * y + x) + 1];
 
-			double prh = bg_hsv[3 * (w * y + x) + 0],
-				prs = bg_hsv[3 * (w * y + x) + 1];
+			double prh = prev_hsv[3 * (w * y + x) + 0],
+				prs = prev_hsv[3 * (w * y + x) + 1];
 
 			if (color_dist(&c0, &c1) > coldist && (fabs(h - prh) >= 90.0 || fabs(s - prs) >= 0.8))
 				mask[(w + 2) * (y + 1) + x + 1] = 1;	
@@ -148,6 +146,7 @@ uint *mask_to_quads(uint *mask, uint w, uint h, uint *sqrw, uint *sqrh)
 	*sqrw = w / QUAD_EDGE + ((w % QUAD_EDGE) ? 1 : 0);
 	*sqrh = h / QUAD_EDGE + ((h % QUAD_EDGE) ? 1 : 0);
 	uint *quads = (uint *) calloc(*sqrw * *sqrh, sizeof(uint));
+
 	for (int y = 1; y <= h; y++) {
 		for (int x = 1; x <= w; x++) {
 			uint sqrx = (x - 1) / QUAD_EDGE;
@@ -171,22 +170,25 @@ double *to_hsv(const Mat *frame)
 		for (int x = 0; x < w; x++) {
 			int mtype;
 			double r, g, b;
+			double max, min, h, s, v;
 				
 			r = (double)frame->data[frame->channels() * (w * y + x) + 0] / 255.0;
 			g = (double)frame->data[frame->channels() * (w * y + x) + 1] / 255.0;
 			b = (double)frame->data[frame->channels() * (w * y + x) + 2] / 255.0;
 			
-			double max, min, h, s, v;
 			max = min = r;
 			mtype = 0;
+
 			if (g > max) {
 				max = g;
 				mtype = 1;
 			}
+
 			if (b > max) {
 				max = b;
 				mtype = 2;	
 			}
+
 			min = (g < min) ? g : min;
 			min = (b < min) ? b : min;
 
@@ -212,7 +214,7 @@ double *to_hsv(const Mat *frame)
 	return hsv;
 }
 
-void find_objects(const Mat *frame, const vector<Mat> *prev_frames, Mat *movement)
+void find_objects(const Mat *frame, Mat *prev_frame, Mat *movement)
 {
 	uint w = frame->cols;
 	uint h = frame->rows;
@@ -220,16 +222,13 @@ void find_objects(const Mat *frame, const vector<Mat> *prev_frames, Mat *movemen
 	uint *quads;
 	uint sqrw, sqrh;
 	double *hsv;
-	vector<double *> prev_hsv;
+	double *prev_hsv;
 	hsv = to_hsv(frame);
 
-	for (int i = 0; i < prev_frames->size(); i++) {
-		prev_hsv.push_back(to_hsv(&((*prev_frames)[i])));
-
-	}	
+	prev_hsv = to_hsv(prev_frame);
 
 
-	mask = create_mask(frame, prev_frames, hsv, &prev_hsv, 25.0);
+	mask = create_mask(frame, prev_frame, hsv, prev_hsv, 25.0);
 	nearest_pixels(mask, w, h);
 	quads = mask_to_quads(mask, w, h, &sqrw, &sqrh);	
 
@@ -255,10 +254,7 @@ void find_objects(const Mat *frame, const vector<Mat> *prev_frames, Mat *movemen
 		}
 	}
 
-	for (int i = 0; i < prev_hsv.size(); i++) {
-		free(prev_hsv[i]);
-	}
-
+	free(prev_hsv);
 	free(hsv);
 	free(mask);
 	free(quads);
@@ -267,7 +263,7 @@ void find_objects(const Mat *frame, const vector<Mat> *prev_frames, Mat *movemen
 int main(int argc, char** argv)
 {
 	Mat frame, clustered, movement;
-	vector<Mat> prev_frames(1);
+	Mat prev_frame;
 
 	// Init video capture device
 	int devid = 0;
@@ -285,11 +281,10 @@ int main(int argc, char** argv)
 	
 	// Create windows
 	namedWindow("Original", CV_WINDOW_AUTOSIZE);
-	namedWindow("Clustered", CV_WINDOW_AUTOSIZE);
 	namedWindow("Movement", CV_WINDOW_AUTOSIZE);
 
 	capt.read(frame);
-	prev_frames[0] = frame.clone();
+	prev_frame = frame.clone();
 
 	while (true) {	
 		bool res = capt.read(frame);
@@ -303,12 +298,9 @@ int main(int argc, char** argv)
 			return -1;
 		}
 
-//		clust(&frame, &clustered, 2);
-
-		find_objects(&clustered, &prev_frames, &movement);
+		find_objects(&clustered, &prev_frame, &movement);
 
 		imshow("Original", frame);
-//		imshow("Clustered", clustered);
 		imshow("Movement", movement);
 	
 		// Key pressing events proccessing
@@ -333,8 +325,7 @@ int main(int argc, char** argv)
 			}
 		}
 
-//		prev_frames.clear();
-		prev_frames[0] = frame.clone();
+		prev_frame = frame.clone();
 	}
 
 	return 0;
