@@ -107,7 +107,7 @@ uint *create_mask(const Mat *frame,
 			double prh = prev_hsv[3 * (w * y + x) + 0],
 				prs = prev_hsv[3 * (w * y + x) + 1];
 
-			if (color_dist(&c0, &c1) > coldist && (fabs(h - prh) >= 90.0 || fabs(s - prs) >= 0.8))
+			if (color_dist(&c0, &c1) > coldist && (fabs(h - prh) >= 30.0 || fabs(s - prs) >= 0.1))
 				mask[(w + 2) * (y + 1) + x + 1] = 1;	
 			else
 				mask[(w + 2) * (y + 1) + x + 1] = 0;
@@ -214,6 +214,156 @@ double *to_hsv(const Mat *frame)
 	return hsv;
 }
 
+int sort_func(const void *a, const void *b)
+{
+	return *((const uchar*) a) - *((const uchar *) b);
+}
+
+void fill_window(const Mat *frame, uchar *tmp_arr, uint frame_w,
+	uint x, uint y, uint channel, uint win_size)
+{
+	uint o = 0;	
+	
+	for (int i = -((int)win_size/2); i <= ((int)win_size/2); i++)
+		for (int j = -((int)win_size/2); j <= ((int)win_size/2); j++)
+			tmp_arr[o++] = frame->data[frame->channels()
+				* (frame_w * (y + i) + (x + j)) + channel];
+}
+
+void median_filter(const Mat *frame, int win_size)
+{
+	Mat tmp = frame->clone();
+	uint w = frame->cols;
+	uint h = frame->rows;
+	uchar tmp_arr[win_size * win_size];
+
+	int sidesz = (win_size - 1) / 2;
+	for (int c = 0; c < frame->channels(); c++)
+		for (int y = sidesz; y < h-sidesz; y++)
+			for (int x = sidesz; x < w-sidesz; x++) {
+				
+				fill_window(frame, tmp_arr, w, x, y, c, win_size);
+
+				qsort(tmp_arr, win_size * win_size, sizeof(uchar), sort_func);
+
+				int wsz_sqr = win_size * win_size;
+				frame->data[frame->channels() * (w * y + x) + c] = tmp_arr[wsz_sqr/2];
+			}
+		
+}
+
+double gauss_curve(double x, double sigma)
+{
+	return (exp(-x * x / 2.0 / sigma / sigma));
+}
+
+void gauss_blur_point_x(const uchar *frame_data, double *tmp_arr, int y, int x,
+	int w, int h, int channels, double *weights, int sigma3)
+{
+	double r = 0.0, g = 0.0, b = 0.0;
+	double s = 0.0;	
+
+	for (int i = -sigma3; i <= sigma3; ++i)
+	{
+		int cur_x = x + i;
+		cur_x = (cur_x < 0) ? 0 : cur_x;
+		cur_x = (cur_x > (w - 1)) ? (w - 1) : cur_x;
+		
+		r += weights[i + sigma3] * (double)(frame_data[channels * (w * y + cur_x) + 0]);
+		g += weights[i + sigma3] * (double)(frame_data[channels* (w * y + cur_x) + 1]);
+		b += weights[i + sigma3] * (double)(frame_data[channels * (w * y + cur_x) + 2]);
+		
+		s += weights[i + sigma3];
+	}
+
+	tmp_arr[channels * (w * y + x) + 0] = r / s;
+	tmp_arr[channels * (w * y + x) + 1] = g / s;
+	tmp_arr[channels * (w * y + x) + 2] = b / s;
+}
+
+void gauss_blur_point_y(uchar *frame_data, const double *tmp_arr, int y, int x,
+	int w, int h, int channels, double *weights, int sigma3)
+{
+	double r = 0.0, g = 0.0, b = 0.0;
+	double s = 0.0;	
+
+	for (int i = -sigma3; i <= sigma3; ++i)
+	{
+		int cur_y = y + i;
+		cur_y = (cur_y < 0) ? 0 : cur_y;
+		cur_y = (cur_y > (h - 1)) ? (h - 1) : cur_y;
+
+		r += weights[i + sigma3] * (double)(frame_data[channels * (w * cur_y + x) + 0]);
+		g += weights[i + sigma3] * (double)(frame_data[channels * (w * cur_y + x) + 1]);
+		b += weights[i + sigma3] * (double)(frame_data[channels * (w * cur_y + x) + 2]);
+
+		s += weights[i + sigma3];
+	}
+
+	frame_data[channels * (w * y + x) + 0] = r / s;
+	frame_data[channels * (w * y + x) + 1] = g / s;
+	frame_data[channels * (w * y + x) + 2] = b / s;
+}
+
+void gauss_blur(const Mat *frame, double sigma)
+{
+	uint w = frame->cols;
+	uint h = frame->rows;
+	double *tmp_arr = (double *)calloc(w * h * frame->channels(), sizeof(double));
+	int sigma3 = (int)(3.0 * sigma);
+	double *weights = (double *)malloc(sizeof(double) * (2 * sigma3 + 1));
+	
+	for (int i = 0; i <= 2*sigma3; ++i)
+		weights[i] = gauss_curve(i - sigma3, sigma);
+
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x)
+			gauss_blur_point_x(frame->data, tmp_arr, y, x, w, h,
+				frame->channels(), weights, sigma3);
+
+	for (int y = 0; y < h; ++y)
+		for (int x = 0; x < w; ++x)
+			gauss_blur_point_y(frame->data, tmp_arr, y, x, w, h,
+				frame->channels(), weights, sigma3);
+
+	free(weights);
+	free(tmp_arr);
+}
+
+void window_blur(const Mat *frame) 
+{
+	uint w = frame->cols;
+	uint h = frame->rows;
+	int channels = frame->channels();
+
+	uchar *frame_data = frame->data;
+
+	for (int y = 1; y <= h - 1; y++) {
+		for (int x = 1; x <= w - 1; x++) {
+			for (int i = 0; i < frame->channels(); i++) {
+				uint sum = 0.0;
+				uint neightbours = 0;
+
+				sum += frame_data[channels * (w * y - 1 + x - 1) + i];
+				sum += frame_data[channels * (w * y - 1 + x) + i];
+				sum += frame_data[channels * (w * y - 1 + x + 1) + i];
+				
+				sum += frame_data[channels * (w * y + x - 1) + i];
+				sum += frame_data[channels * (w * y + x) + i];
+				sum += frame_data[channels * (w * y + x + 1) + i];
+
+				sum += frame_data[channels * (w * y + 1 + x - 1) + i];
+				sum += frame_data[channels * (w * y + 1 + x) + i];
+				sum += frame_data[channels * (w * y + 1 + x + 1) + i];
+
+				sum /= 9;
+
+				frame_data[channels * (w * y + x) + i] = (uchar)sum;
+			}
+		}
+	}
+}
+
 void find_objects(const Mat *frame, Mat *prev_frame, Mat *movement)
 {
 	uint w = frame->cols;
@@ -223,14 +373,22 @@ void find_objects(const Mat *frame, Mat *prev_frame, Mat *movement)
 	uint sqrw, sqrh;
 	double *hsv;
 	double *prev_hsv;
+
+//	window_blur(frame);
+//	window_blur(prev_frame);
+	median_filter(frame, 3);
+	median_filter(prev_frame, 3);
+//	gauss_blur(frame, 1.0);
+//	gauss_blur(prev_frame, 1.0);
+
 	hsv = to_hsv(frame);
-
 	prev_hsv = to_hsv(prev_frame);
-
-
 	mask = create_mask(frame, prev_frame, hsv, prev_hsv, 25.0);
 	nearest_pixels(mask, w, h);
 	quads = mask_to_quads(mask, w, h, &sqrw, &sqrh);	
+
+
+	*movement = frame->clone();
 
 /*
 	for (int y = 0; y < h; y++) {
@@ -254,6 +412,7 @@ void find_objects(const Mat *frame, Mat *prev_frame, Mat *movement)
 		}
 	}
 
+
 	free(prev_hsv);
 	free(hsv);
 	free(mask);
@@ -264,7 +423,6 @@ int main(int argc, char** argv)
 {
 	Mat frame, clustered, movement;
 	Mat prev_frame;
-
 	// Init video capture device
 	int devid = 0;
 
@@ -278,10 +436,15 @@ int main(int argc, char** argv)
 		system("pause");
 		return -1;
 	}
+
+	capt.set(CV_CAP_PROP_FRAME_WIDTH,320);
+	capt.set(CV_CAP_PROP_FRAME_HEIGHT,240);
+
+
 	
 	// Create windows
-	namedWindow("Original", CV_WINDOW_AUTOSIZE);
-	namedWindow("Movement", CV_WINDOW_AUTOSIZE);
+	namedWindow("Original", WINDOW_NORMAL);
+	namedWindow("Movement", WINDOW_NORMAL);
 
 	capt.read(frame);
 	prev_frame = frame.clone();
