@@ -1,8 +1,7 @@
+#include <cv.hpp>
 #include <iostream>
 #include <stdlib.h>
 #include <stdio.h>
-
-#include "k_means.h"
 
 using namespace cv;
 using namespace std;
@@ -374,6 +373,9 @@ void find_objects(const Mat *frame, Mat *prev_frame, Mat *movement)
 	double *hsv;
 	double *prev_hsv;
 
+
+	*movement = frame->clone();
+
 //	window_blur(frame);
 //	window_blur(prev_frame);
 	median_filter(frame, 3);
@@ -388,7 +390,6 @@ void find_objects(const Mat *frame, Mat *prev_frame, Mat *movement)
 	quads = mask_to_quads(mask, w, h, &sqrw, &sqrh);	
 
 
-	*movement = frame->clone();
 
 /*
 	for (int y = 0; y < h; y++) {

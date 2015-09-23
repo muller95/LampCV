@@ -1,0 +1,1 @@
+IplImage *sobel(IplImage *frame);
