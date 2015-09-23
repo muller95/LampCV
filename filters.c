@@ -110,26 +110,26 @@ void gaussblur(IplImage *img, double sigma)
 
 
 	
-	for (i = 0; i <= 2*sigma3; ++i) {
+	for (i = 0; i <= 2*sigma3; i++) {
 		ws[i] = gaussfunc(i - sigma3, sigma);
 	}
 
-	for (y = 0; y < h; ++y) {
-		for (x = 0; x < w; ++x) {
+	for (y = 0; y < h; y++) {
+		for (x = 0; x < w; x++) {
 			gblurx(data, tmpx, y, x, w, h, chans, ws, sigma3);
 		}
 	}
 
-	for (y = 0; y < h; ++y) {
-		for (x = 0; x < w; ++x) {
+	for (y = 0; y < h; y++) {
+		for (x = 0; x < w; x++) {
 			gblury(data, tmpy, y, x, w, h, chans, ws, sigma3);
 		}
 	}
 
-	for (y = 0; y < h; ++y) {
-		for (x = 0; x < w; ++x) {
+	for (y = 0; y < h; y++) {
+		for (x = 0; x < w; x++) {
 			for (i = 0; i < chans; i++) {
-				img->imageData[chans * (y * w + x) + i] = ((int)tmpx[chans * (y * w + x) + i] + tmpy[chans * (y * w + x) + i]);
+				img->imageData[chans * (y * w + x) + i] = (int)(tmpx[chans * (y * w + x) + i] + tmpy[chans * (y * w + x) + i]);
 			}
 		}
 	}
