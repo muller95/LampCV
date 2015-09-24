@@ -17,12 +17,15 @@ IplImage *lukkan1d(IplImage *curr, IplImage *prev)
 	w = curr->width;
 
 	copy = cvCloneImage(curr);
-//	gaussblur(copy, 0.7);
+//	gaussblur(copy, 3.0);
+	medianfilter(curr, 5);
 	cvdata = getvals(curr);
 	cvReleaseImage(&copy);
 
 	copy = cvCloneImage(prev);	
-//	gaussblur(copy, 0.7);
+//	gaussblur(copy, 3.0);
+	medianfilter(curr, 5);
+	
 	pvdata = getvals(prev);
 	cvReleaseImage(&copy);
 
@@ -32,14 +35,23 @@ IplImage *lukkan1d(IplImage *curr, IplImage *prev)
 			double deriv = (double)(pvdata[y * w + x + 1] - pvdata[y * w + x]);
 			double dfdt = (double)(pvdata[y * w + x] - cvdata[y * w + x]);     
 			int d = (int)(trunc(dfdt / deriv) + 0.5);
+
+			// filters are lagging like a shit
+			// but i tried to set up a threshold here,
+			// you should try it too.
+			//
+			//                  ||
+			//                 _||_
+			//                 \  /
+			//                  \/
+			//
 			if (deriv != 0 && d != 0) {
-				cvLine(res, cvPoint(x, y), cvPoint(x + d, y), CV_RGB(0, 255, 0), 0, 8, 0);
+				cvLine(res, cvPoint(x, y), cvPoint(x + d, y),
+					CV_RGB(0, 255, 0), 0, 8, 0);
 			}
-			//printf("d=%d\n", d);
 		}
 	}
 	
-	gaussblur(curr, 1.0);
-	gaussblur(curr, 1.0);
-	return curr;
+	return res;
+//	return curr;
 }

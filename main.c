@@ -58,7 +58,7 @@ int main(int argc, char **argv)
 				printf("keycode=%d\n", key);;
 		}
 
-//		cvReleaseImage(&frame);
+	//	cvReleaseImage(&frame);
 	//	cvReleaseImage(&prev);
 		prev = curr;
 	}
