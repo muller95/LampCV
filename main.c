@@ -20,6 +20,8 @@ enum KEY {
 int main(int argc, char **argv)
 {
 	int dev, flag;
+	double alpha = 1.0;
+	double *un, *vn;
 	CvCapture *capt;
 	IplImage *frame, *prev, *curr, *motion;
 
@@ -33,25 +35,45 @@ int main(int argc, char **argv)
 		perror("Error opening cam!");
 		exit(1);
 	}
-	cvNamedWindow("Original", CV_WINDOW_AUTOSIZE);
+	cvNamedWindow("Original", CV_WINDOW_NORMAL);
+
+	cvSetCaptureProperty(capt,CV_CAP_PROP_FRAME_WIDTH, 160);
+	cvSetCaptureProperty(capt, CV_CAP_PROP_FRAME_HEIGHT, 120);
+	 
+	 
 
 	flag = 1;
 	
 	frame = cvQueryFrame(capt);
-	prev = cvCloneImage(frame);	
+	prev = cvCloneImage(frame);
+	un = calloc(frame->width * frame->height, sizeof(double));
+	vn = calloc(frame->width * frame->height, sizeof(double));
 	while (flag) {
 		int key;
 	
 		frame = cvQueryFrame(capt);
 		curr = cvCloneImage(frame);	
+
 		
-		motion = lukkan1d(curr, prev);
+	//	motion = lukkan1d(curr, prev);
+
+//		un = calloc(frame->width * frame->height, sizeof(double));
+//		vn = calloc(frame->width * frame->height, sizeof(double));
+		motion = hornschunk(curr, prev, un, vn, alpha);
 
 		cvShowImage("Original", motion);
 
 		switch ((key = cvWaitKey(10))) {
 		case ESC:
 			flag = 0;
+			break;
+		case KEY_PLUS:
+			alpha += 0.1;
+			printf("alpha=%lf\n", alpha);
+			break;
+		case KEY_MINUS:
+			alpha = (alpha > 0.1)? alpha - 0.1 : 0.1;
+			printf("alpha=%lf\n", alpha);
 			break;
 		default:
 			if (key != -1)

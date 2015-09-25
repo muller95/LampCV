@@ -10,26 +10,27 @@ void winblur(IplImage *img);
 void gaussblur(IplImage *img, double sigma);
 void median_filter(IplImage *img, int win_size);
 
-int sortfunc(const void *a, const void *b)
+static int comp(const void *a, const void *b)
 {
 	return *((const uchar*) a) - *((const uchar *) b);
 }
 
-void fillwin(unsigned char *data, uchar *tmp_arr, uint frame_w, int chans,
-	uint x, uint y, uint channel, uint win_size)
+static void fillwin(unsigned char *data, unsigned char *tmp, int w, int chan, int x, int y, int chans, int wsize)
 {
 	int i, j;
-	uint o = 0;	
+	int o = 0;	
 	
-	for (i = -((int)win_size/2); i <= ((int)win_size/2); i++)
-		for (j = -((int)win_size/2); j <= ((int)win_size/2); j++)
-			tmp_arr[o++] = data[chans * (frame_w * (y + i) + (x + j)) + channel];
+	for (i = -(wsize / 2); i <= (wsize / 2); i++) {
+		for (j = -(wsize / 2); j <= (wsize / 2); j++) {
+			tmp[o++] = data[chans * (w * (y + i) + (x + j)) + chan];
+		}
+	}
 }
 
 void medianfilter(IplImage *img, int wsize)
 {
 	int w, h, chans;
-	uchar *data, *tmparr;
+	unsigned char *data, *tmp;
 	
 	w = img->width;
 	h = img->height;
@@ -39,22 +40,22 @@ void medianfilter(IplImage *img, int wsize)
 
 	int wszsqr = wsize * wsize;
 	
-	tmparr = (uchar *)calloc(wszsqr * chans, sizeof(uchar));
+	tmp = (unsigned char *)calloc(wszsqr * chans, sizeof(unsigned char));
 
 	int c, y, x;
 
 	int sidesz = (wsize - 1) / 2;
 	for (c = 0; c < chans; c++)
-		for (y = sidesz; y < h-sidesz; y++)
-			for (x = sidesz; x < w-sidesz; x++) {	
-				fillwin(data, tmparr, w, chans, x, y, c, wsize);
+		for (y = sidesz; y < h - sidesz; y++)
+			for (x = sidesz; x < w - sidesz; x++) {	
+				fillwin(data, tmp, w, chans, x, y, c, wsize);
 
-				qsort(tmparr, wszsqr, sizeof(uchar), sortfunc);
+				qsort(tmp, wszsqr, sizeof(unsigned char), comp);
 
-				data[chans * (w * y + x) + c] = tmparr[wszsqr/2];
+				data[chans * (w * y + x) + c] = tmp[wszsqr/2];
 			}
 
-	free(tmparr);	
+	free(tmp);	
 }
 
 void winblur(IplImage *img)
@@ -92,7 +93,7 @@ void winblur(IplImage *img)
 	}
 }
 
-static double gaussfunc(double x, double sigma)
+static double gfunc(double x, double sigma)
 {
 	return exp((-1) * (x * x) / (2.0 * sigma * sigma));
 }
@@ -102,9 +103,6 @@ static void gblurx(unsigned char *data, double *tmp, int y, int x, int w, int h,
 {
 	double s = 0.0;	
 	int i, j;
-
-// this summation must consider cases, when there are less pixels,
-// than 2 * sigma3, i.e. borders of an image.
 
 	for (i = 0; i <= 2 * sigma3; i++)
 		s += ws[i];
@@ -166,12 +164,8 @@ void gaussblur(IplImage *img, double sigma)
 	tmpy = (double *)calloc(w * h * chans, sizeof(double));
 
 
-// here is an idea for a better implementation: use one temporal buffer and
-// after convolution with X part, store the result here. Then convolve with Y
-// part, replacing original signal with obtained result.
-
 	for (i = 0; i <= 2*sigma3; i++) {
-		ws[i] = gaussfunc(i - sigma3, sigma);
+		ws[i] = gfunc(i - sigma3, sigma);
 	}
 
 	for (y = 0; y < h; y++) {
