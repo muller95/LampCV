@@ -4,15 +4,17 @@
 #include <cv.h>
 #include <highgui.h>
 #include "clsystems.h"
+#include "filters.h"
 
-IplImage *sobel(IplImage *frame);
-
-IplImage *sobel(IplImage *frame)
+IplImage *sobel(IplImage *frame, double thres, double sigma)
 {
-	double thres = 50;
 	int x,y,w,h, chans;
-	IplImage *res;
+	IplImage *res, *copy;
 	unsigned char *vdata;
+
+	copy = cvCloneImage(frame);
+	gaussblur(copy, sigma);
+
 	h = frame->height;
 	w = frame->width;
 	vdata = getvals(frame);
