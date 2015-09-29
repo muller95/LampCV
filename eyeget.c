@@ -20,10 +20,11 @@ enum KEY {
 int eyeget(IplImage *frame, int thres, CvPoint *center)
 {
 	unsigned char *vdata, *mask;
-	int x, y, w, h, ax, ay, n;
+	int x, y, w, h, ax, ay, n, chans;
 	int xmax, xmin, ymax, ymin;
 	int r;
 
+	chans = frame->nChannels;
 	vdata = getvals(frame);
 	h = frame->height;
 	w = frame->width;
@@ -41,7 +42,9 @@ int eyeget(IplImage *frame, int thres, CvPoint *center)
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
 			if (vdata[y * w + x] < thres) {
-				mask[y*w+x] = 1;
+				frame->imageData[chans*(y*w+x)+0] = 255;
+				frame->imageData[chans*(y*w+x)+1] = 0;
+				frame->imageData[chans*(y*w+x)+2] = 0;
 				n++;
 				ax += x;
 				ay += y;
@@ -57,7 +60,7 @@ int eyeget(IplImage *frame, int thres, CvPoint *center)
 	if (n > 0) {	
 		center->x = ax / n;
 		center->y = ay / n;
-		r = (xmax - xmin < ymax - ymin)? xmax - xmin : ymax - ymin;
+		r = (xmax - xmin < ymax - ymin)? (xmax - xmin) / 2 : (ymax - ymin) / 2;
 	}
 
 	return r;
