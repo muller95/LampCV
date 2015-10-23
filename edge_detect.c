@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <float.h>
 #include <cv.h>
 #include <highgui.h>
 #include "clsystems.h"
@@ -79,20 +80,21 @@ IplImage *sobel(IplImage *frame, double thres, double sigma)
 	return res;
 }
 
-double **hough(IplImage *frame, double thres, double sigma)
+int **hough(IplImage *frame, double thres, double sigma)
 {
 	int x, y, w, h, i;
 	int d, arange;
 	IplImage *copy;
 	unsigned char *vdata;
-	double **acc;
+	int **acc;
 
 	h = frame->height;
 	w = frame->width;
 
-	arange = (int)(2.0 * M_PI * 100.0 + 2);
+	arange = 180;
+	d = (int)sqrt(w * w + h * h);
+
 	acc = malloc(sizeof(double *) * arange);
-	d = (int)sqrt(8 * (w * w + h * h)) + 2;
 	for (i = 0; i < arange; i++)
 		acc[i] = calloc(d, sizeof(double)); 
 
@@ -101,22 +103,29 @@ double **hough(IplImage *frame, double thres, double sigma)
 
 	vdata = getvals(frame);
 
-	for(y = 1; y < h-1;y++){
-		for(x = 1;x < w-1;x++) {
+	for(y = 0; y < h; y++){
+		for(x = 0; x < w; x++) {
 			double gx, gy, gr;
 			grad(vdata, w, h, x, y, &gx, &gy);
 			
 			gr = sqrt(gx * gx + gy * gy);
 			
 			if (gr >= thres) {
-				int ang, p;
-				ang = (int)(atan2(gy, gx) * 100.0 + arange / 2);
-				p = (int)(cos(ang) * x + sin(ang) * y + d / 2);
-				acc[ang][p] += 1;
+				int ang, r;
+				for (r = 0; r < d; r++) {
+					for (ang = 0; ang < arange; ang++) {
+						double theta;
+
+						theta = (double)ang * M_PI / 180.0;
+						if (fabs(y * sin(theta) + x * cos(theta) - (double)r) < DBL_EPSILON)
+							acc[ang][r] += 1;
+					}
+				}
 			}
 		}
+		printf("y=%d\n", y);
 	}
 
 	free(vdata);
-	return 0;
+	return acc;
 }

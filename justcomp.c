@@ -6,7 +6,7 @@
 #include "clsystems.h"
 #include "filters.h"
 
-IplImage *frapscompare(IplImage *curr, Iplimage *prev)
+IplImage *frapscompare(IplImage *curr, IplImage *prev)
 {
 	int x, y, h, w;
 	IplImage *res, *copy;
