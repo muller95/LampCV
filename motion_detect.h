@@ -1,2 +1,1 @@
-IplImage *lukkan1d(IplImage *curr, IplImage *prev);
-IplImage *hornschunk(IplImage *curr, IplImage *prev, double alpha, int n);
+struct IplImage *hornschunk(struct IplImage *curr, struct IplImage *prev, double alpha, int n);

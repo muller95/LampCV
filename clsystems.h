@@ -1,1 +1,1 @@
-unsigned char *getvals(IplImage *img); 
+unsigned char *getvals(struct IplImage *img); 

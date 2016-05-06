@@ -1,2 +1,1 @@
-IplImage *frapscompare(IplImage *curr, IplImage *prev);
-
+struct IplImage *framescompare(struct IplImage *curr, struct IplImage *prev);

@@ -1,23 +1,15 @@
+IPLPATH=/home/vadim/LampCV-4-new/ipllib
+MYXPATH=/home/vadim/LampCV-4-new/myxlib
 CC = gcc
-SOURCES = edge_detect.c clsystems.c motion_detect.c filters.c justcomp.c
-CFLAGS = -Wall -g `pkg-config --cflags opencv` `pkg-config --libs opencv` -lm
-BINS = motion
-OBJS_LIB = $(SOURCES:.c=.o)
+CFLAGS = -g -Wall -lm -lX11
+SRCS =  $(IPLPATH)/iplimage.c $(IPLPATH)/iplvideo.c draw.c
+SRCS += $(MYXPATH)/xfuncs.c 
+SRCS += justcomp.c motion_detect.c clsystems.c
 
-all:motion edge eyeget
+all:fcomp motion
 
-motion: motion.c $(SOURCES)
-	$(CC) $(CFLAGS) -o motion motion.c $(SOURCES)
+fcomp: fcompare.c $(SRCS)
+	$(CC) $(CFLAGS) -I/usr/include/libpng12 -lpng12 -o fcomp fcompare.c $(SRCS)
 
-edge: edge.c $(SOURCES)
-	$(CC) $(CFLAGS) -o edge edge.c $(SOURCES)
-
-eyeget: eyeget.c $(SOURCES)
-	$(CC) $(CFLAGS) -o eyeget eyeget.c $(SOURCES)
-
-fcompare: fcompare.c $(SOURCES)
-	$(CC) $(CFLAGS) -o fcomp fcompare.c $(SOURCES)
-
-clean:
-	rm *.o
-
+motion:	motion.c $(SRCS)
+	$(CC) $(CFLAGS) -I/usr/include/libpng12 -lpng12 -o motion motion.c $(SRCS)

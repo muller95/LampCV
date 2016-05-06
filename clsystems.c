@@ -1,21 +1,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <cv.h>
-#include <highgui.h>
+#include "ipllib/ipldefs.h"
+#include "ipllib/iplimage.h"
 
-unsigned char *getvals(IplImage *img); 
 
-unsigned char *getvals(IplImage *img) 
+unsigned char *getvals(struct IplImage *img) 
 {
 	int x, y, chans, w, h;
 	unsigned char *data, *out;
 
 	h = img->height;
 	w = img->width;
-	chans = img->nChannels;
+	chans = img->nchans;
 	out = malloc(sizeof(unsigned char) * w * h);
-	data = (unsigned char *)img->imageData;
+	data = (unsigned char *)img->data;
 
 	for (y = 0; y < h; y++) {
 		for (x = 0; x < w; x++) {
