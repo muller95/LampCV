@@ -1,5 +1,5 @@
-IPLPATH=/home/vadim/LampCV-4-new/ipllib
-MYXPATH=/home/vadim/LampCV-4-new/myxlib
+IPLPATH=/home/user/LampCV/ipllib
+MYXPATH=/home/user/LampCV/myxlib
 CC = gcc
 CFLAGS = -g -Wall -lm -lX11
 SRCS =  $(IPLPATH)/iplimage.c $(IPLPATH)/iplvideo.c draw.c

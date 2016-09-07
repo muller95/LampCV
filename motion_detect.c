@@ -37,7 +37,7 @@ void nearpix(unsigned int *mask, unsigned int w, unsigned int h)
 }
 
 
-struct IplImage *hornschunk(struct IplImage *curr, struct IplImage *prev, double alpha, int n)
+struct IplImage *hornschunk(struct IplImage *curr, struct IplImage *prev, double alpha, int n, double *s)
 {
 	int x, y, w, h, i;
 	double ix, iy, it; 
@@ -83,17 +83,19 @@ struct IplImage *hornschunk(struct IplImage *curr, struct IplImage *prev, double
 		vn = vn1;
 	}
 
-
-	
+	double maxlen = 0.0;
+		
 	for (y = 1; y < h - 1; y++) {
 		for (x = 1; x < w - 1; x++) {
-			len = sqrt(fabs(un1[y*w+x]) * fabs(un1[y*w+x]) + fabs(vn1[y*w+x]) * fabs(vn1[y*w+x]));
+			len = sqrt(fabs(un1[y * w + x]) * fabs(un1[y * w + x]) + fabs(vn1[y * w + x]) * fabs(vn1[y * w + x]));
 			if (len > 5.0){
-				drawLine(res, (int)x, (int)y, (int)(x + un1[y*w+x]), (int)(y + vn1[y*w+x]));
+				drawLine(res, (int)x, (int)y, (int)(x + un1[y * w + x]), (int)(y + vn1[y * w + x]));
+				if (len >= maxlen)
+					maxlen = len;
 			}	
 		}
 	}
-
+	*s = maxlen;
 //	free(un);
 //	free(vn);
 	free(un1);

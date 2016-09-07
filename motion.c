@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <time.h>
 
 #include <string.h>
 #include <png.h>
@@ -37,7 +36,7 @@ int main(int argc, char **argv)
 {
 	int x, y;
 	double alpha = 9.0;
-
+	double s;
 	Window win1;
 	GC gc1;
 	XEvent event;
@@ -47,13 +46,6 @@ int main(int argc, char **argv)
 	struct IplImage *prev1, *curr1, *motion;
 	struct IplDev *dev1;
 
-	time_t start, end;
-	int f;
-
-	f = 0;
-	start = 0;
-	end = 0;
-	
 	x = 0;
 	y = 0;
 	initX();
@@ -83,22 +75,13 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	flag = 1;
-	start = time(NULL);
 	
 	while (flag) {
-		f++;	
-		end = time(NULL);
-		if (end - start >= 1.0) {
-			printf("fps = %i\n", f);
-			f = 0;
-			start = end;
-		}
-	
 		if ((curr1 = ipl_getframe(dev1)) == NULL) {
 			printf("error capturing curr1\n");
 			return 1;
 		}
-		motion = hornschunk(curr1, prev1, alpha, 25);
+		motion = hornschunk(curr1, prev1, alpha, 25, &s);
 		ipl_scaleimg(&motion, 640, 480);
 		if (motion->data == NULL)
 			perror("Something bad with data");
@@ -107,7 +90,10 @@ int main(int argc, char **argv)
 		ipl_freeimg(&prev1);
 		prev1 = curr1;
 
+		system("clear");
+		printf("speed = %lf мм/кадр\n", s * 0.2636 * 10);
 
+		
 		ipl_freeimg(&motion);
 		XCheckTypedWindowEvent(theDisplay, win1, ButtonPress, &event);
 		if (event.xbutton.button == 1)
