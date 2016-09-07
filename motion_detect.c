@@ -55,12 +55,13 @@ struct IplImage *hornschunk(struct IplImage *curr, struct IplImage *prev, double
 	
 	res = ipl_cloneimg(prev);
 	
-	un = calloc(curr->width * curr->height, sizeof(double));
-	vn = calloc(curr->width * curr->height, sizeof(double));
-	
+		
 	un1 = calloc(curr->width * curr->height, sizeof(double));
 	vn1 = calloc(curr->width * curr->height, sizeof(double));
 	for (i = 0; i < n; i++) {
+		un = calloc(curr->width * curr->height, sizeof(double));
+		vn = calloc(curr->width * curr->height, sizeof(double));
+
 		for (y = 1; y < h - 1; y++) {
 			for (x = 1; x < w - 1; x++) {
 				ix = (double)(1 / 4.0 * (pvdata[(y+1)*w+x] - pvdata[y*w+x] + pvdata[(y+1)*w+(x+1)] - pvdata[y*w+(x+1)] 
@@ -79,6 +80,9 @@ struct IplImage *hornschunk(struct IplImage *curr, struct IplImage *prev, double
 				vn1[y * w + x] = avn - iy * (ix * aun + iy * avn + it) / (ix * ix + iy * iy + alpha * alpha);	  
 			}
 		}
+		free(un);
+		free(vn);
+
 		un = un1;
 		vn = vn1;
 	}
@@ -88,7 +92,7 @@ struct IplImage *hornschunk(struct IplImage *curr, struct IplImage *prev, double
 	for (y = 1; y < h - 1; y++) {
 		for (x = 1; x < w - 1; x++) {
 			len = sqrt(fabs(un1[y * w + x]) * fabs(un1[y * w + x]) + fabs(vn1[y * w + x]) * fabs(vn1[y * w + x]));
-			if (len > 5.0){
+			if (len > 3.0){
 				drawLine(res, (int)x, (int)y, (int)(x + un1[y * w + x]), (int)(y + vn1[y * w + x]));
 				if (len >= maxlen)
 					maxlen = len;
@@ -96,8 +100,6 @@ struct IplImage *hornschunk(struct IplImage *curr, struct IplImage *prev, double
 		}
 	}
 	*s = maxlen;
-//	free(un);
-//	free(vn);
 	free(un1);
 	free(vn1);
 	free(pvdata);

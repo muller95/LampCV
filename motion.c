@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 		prev1 = curr1;
 
 		system("clear");
-		printf("speed = %lf мм/кадр\n", s * 0.2636 * 10);
+		printf("Скорость = %lf мм/кадр\n", s * 0.2636 * 10);
 
 		
 		ipl_freeimg(&motion);
